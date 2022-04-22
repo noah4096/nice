@@ -1,7 +1,9 @@
 import * as term from "./term.js";
 
-let surface = new term.Surface(80, 24);
+let surface = new term.Surface(80, 25);
+let tty = new term.Terminal(surface);
 
-surface.text(10, 20, "Hello world!");
-
-surface.drawToTTY();
+setInterval(() => {
+	tty.print("Hello world! ");
+	surface.drawToTTY();
+});
