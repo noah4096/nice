@@ -3,6 +3,7 @@
 	"version": "0.1.0",
 	"description": "An easy-to-use text area and IDE for the terminal",
 	"main": "src/main.js",
+	"type": "module",
 	"scripts": {
 		"start": "node src/main.js"
 	},
