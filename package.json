@@ -3,6 +3,9 @@
 	"version": "0.1.0",
 	"description": "An easy-to-use text area and IDE for the terminal",
 	"main": "src/main.js",
+	"scripts": {
+		"start": "node src/main.js"
+	},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/noah4096/nice.git"
