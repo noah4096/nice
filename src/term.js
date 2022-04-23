@@ -57,7 +57,7 @@ export class Surface {
 	scroll(lines = 1) {
 		let chars = lines * this.width;
 
-		[this.charBuffer].forEach((buffer) => {
+		[this.charBuffer, this.formatBuffer].forEach((buffer) => {
 			for (let i = 0; i < buffer.length; i++) {
 				buffer[i] = buffer[i + chars] || "";
 			}
