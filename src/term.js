@@ -1,12 +1,29 @@
 import * as process from "process";
 
+const INT = Math.floor;
+
+export function getSize() {
+	return {width: process.stdout.columns, height: process.stdout.rows};
+}
+
 export class Surface {
 	constructor(width, height) {
 		this.width = width;
 		this.height = height;
 
-		this.charBuffer = new Array(this.width * this.height).fill("");
-		// TODO: store other buffers such as for colour etc
+		this.charBuffer = new Array(this.width * this.height).fill(""); // for displayed chars
+		this.formatBuffer = new Array(this.width * this.height).fill(""); // for char cell formatting (eg colour)
+		this.dirtyBuffer = new Array(this.width * this.height).fill(true); // set to true when char is set until next TTY draw
+	}
+
+	static fullSize() {
+		let size = getSize();
+
+		return new this(size.width, size.height);
+	}
+
+	coordsToIndex(x, y) {
+		return (INT(y) * this.width) + INT(x);
 	}
 
 	read(x, y, buffer = this.charBuffer) {
@@ -14,7 +31,7 @@ export class Surface {
 			throw RangeError("Attempt to read from surface outside of dimensions");
 		}
 
-		return buffer[(y * this.width) + x];
+		return buffer[this.coordsToIndex(x, y)];
 	}
 
 	write(x, y, data, buffer = this.charBuffer) {
@@ -22,14 +39,18 @@ export class Surface {
 			throw RangeError("Attempt to write to surface outside of dimensions");
 		}
 
-		buffer[(y * this.width) + x] = data;
+		let i = this.coordsToIndex(x, y);
+
+		buffer[i] = data;
+		this.dirtyBuffer[i] = true;
 	}
 
-	text(x, y, text) {
+	text(x, y, text, format = "") {
 		let chars = [...text];
 
 		for (let i = 0; i < chars.length; i++) {
 			this.write(x + i, y, chars[i]);
+			this.write(x + i ,y, format, this.formatBuffer);
 		}
 	}
 
@@ -41,6 +62,8 @@ export class Surface {
 				buffer[i] = buffer[i + chars] || "";
 			}
 		});
+
+		this.dirtyBuffer.fill(true, 0, this.dirtyBuffer.length - chars);
 	}
 
 	drawToSurface(surface, x = 0, y = 0) {
@@ -64,25 +87,44 @@ export class Surface {
 		// instead, we push each bit we want to append to the array and then join the whole array up for one final string
 		// then we write that final string using a single process.stdout.write command
 
-		// TODO: works fine on 80x25 display but not for large displays
-		// we need to have some sort of "dirty" bit so that only changed cells are rerendered
+		// FIXME: writing at bottom-right corner of TTY causes it to scroll
 
 		let commands = [];
+		let previousFormat = null; // let first char determine format
 
 		for (let yi = 0; yi < this.height; yi++) {
-			commands.push(`\x1b[${yi};0H`);
+			let dirtyXStart = 0;
+			let isClean = true;
 
 			for (let xi = 0; xi < this.width; xi++) {
-				let char = this.read(xi, yi);
+				// if we haven't encountered a dirty cell yet and it's still dirty
+				if (isClean && !this.read(xi, yi, this.dirtyBuffer)) {
+					dirtyXStart++;
+					continue;
+				}
 
-				if (["", "\0"].includes(char)) {
-					char = " ";
+				// if we haven't encountered a dirty cell yet and this one is the first dirty cell
+				if (isClean) {
+					isClean = false;
+					commands.push(`\x1b[${yi + 1};${dirtyXStart + 1}H`);
+				}
+
+				let char = this.read(xi, yi);
+				let format = this.read(xi, yi, this.formatBuffer);
+
+				// always fill cell
+				if (["", "\0"].includes(char)) char = " ";
+
+				if (format != previousFormat) {
+					previousFormat = format;
+					commands.push(`\x1b[${format || "0"}m`); // if format string is empty, then put 0 which is SGR reset
 				}
 
 				commands.push(char);
 			}
 		}
 
+		this.dirtyBuffer.fill(false);
 		process.stdout.write(commands.join(""));
 	}
 }
@@ -93,6 +135,7 @@ export class Terminal {
 
 		this.x = 0;
 		this.y = 0;
+		this.format = "0";
 	}
 
 	get width() {
@@ -103,8 +146,13 @@ export class Terminal {
 		return this.surface.height;
 	}
 
-	print(chars) {
-		let text = [...chars];
+	goto(x, y) {
+		this.x = INT(x);
+		this.y = INT(y);
+	}
+
+	print(text) {
+		let chars = [...text];
 
 		for (let i = 0; i < chars.length; i++) {
 			let char = chars[i];
@@ -126,7 +174,7 @@ export class Terminal {
 					break;
 
 				default:
-					this.surface.text(this.x, this.y, char);
+					this.surface.text(this.x, this.y, char, this.format);
 					this.x++;
 			}
 
