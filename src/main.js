@@ -23,6 +23,8 @@ let loop = setInterval(() => {
 			tty.goto(0, 0);
 			tty.print(`${event.type} ${event.x} ${event.y} ${event.data.substring(1)}\n`);
 
+			// FIXME: resizing terminal to be big then dragging outside of inital bounds can cause error
+
 			if (event.type == "left") {
 				x1 = event.x;
 				y1 = event.y;
