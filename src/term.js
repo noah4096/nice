@@ -71,7 +71,7 @@ export class TTYEventManager {
 			}
 
 			this.queue.push(new TTYKeyboardEvent(data));
-		}, 100);
+		});
 	}
 
 	stop() {
@@ -138,6 +138,20 @@ export class Surface {
 		});
 
 		this.dirtyBuffer.fill(true, 0, this.dirtyBuffer.length - chars);
+	}
+
+	rect(x1, y1, x2, y2, data, buffer = this.formatBuffer) {
+		for (let yi = Math.min(y1, y2); yi < Math.max(y1, y2); yi++) {
+			for (let xi = Math.min(x1, x2); xi < Math.max(x1, x2); xi++) {
+				this.write(xi, yi, data, buffer);
+			}
+		}
+	}
+
+	clear(format = "0") {
+		this.charBuffer.fill("");
+		this.formatBuffer.fill(format);
+		this.dirtyBuffer.fill(true);
 	}
 
 	drawToSurface(surface, x = 0, y = 0) {
