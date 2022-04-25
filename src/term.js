@@ -6,6 +6,80 @@ export function getSize() {
 	return {width: process.stdout.columns, height: process.stdout.rows};
 }
 
+export class TTYEvent {
+	constructor(data) {
+		this.data = data;
+	}
+
+	static matches(data) {
+		return false;
+	}
+}
+
+export class TTYKeyboardEvent extends TTYEvent {
+	constructor(data) {
+		super(data);
+	}
+
+	static matches(data) {
+		return true;
+	}
+}
+
+export class TTYMouseEvent extends TTYEvent {
+	constructor(data) {
+		super(data);
+
+		let matches = this.constructor.matches(data);
+
+		this.type = {
+			0: "left",
+			1: "middle",
+			2: "right",
+			32: "leftDrag",
+			33: "middleDrag",
+			34: "rightDrag",
+			35: "move",
+			64: "scrollUp",
+			65: "scrollDown"
+		}[matches[1]] || null;
+
+		this.x = matches[2] - 1;
+		this.y = matches[3] - 1;
+	}
+
+	static matches(data) {
+		return data.match(/^\x1b\[\<(\d+);(\d+);(\d+)(.)$/);
+	}
+}
+
+export class TTYEventManager {
+	constructor() {
+		this.queue = [];
+	}
+
+	start() {
+		process.stdin.setRawMode(true);
+		process.stdin.resume();
+		process.stdin.setEncoding("utf-8");
+		process.stdout.write("\x1b[?1003h\x1b[?1015h\x1b[?1006h"); // enable mouse reporting
+
+		process.stdin.on("data", (data) => {
+			if (TTYMouseEvent.matches(data)) {
+				this.queue.push(new TTYMouseEvent(data));
+				return;
+			}
+
+			this.queue.push(new TTYKeyboardEvent(data));
+		}, 100);
+	}
+
+	stop() {
+		process.stdin.setRawMode(false);
+		process.stdout.write("\x1b[?1000l\x1b[?1003l"); // disable mouse reporting
+	}
+}
+
 export class Surface {
 	constructor(width, height) {
 		this.width = width;
